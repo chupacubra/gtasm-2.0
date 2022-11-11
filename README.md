@@ -18,4 +18,5 @@ What gTASM adds to the computer:
 
 #### Social links
 Discord: chupacaca#1506
+
 Steam: [Profile](https://steamcommunity.com/profiles/76561198086726651/)
