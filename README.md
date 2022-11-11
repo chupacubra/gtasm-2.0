@@ -11,7 +11,7 @@ What gTASM adds to the computer:
 
 #### What's new in 2.0?
 + Complete recycling of old verson
-+ Program memory(~ 240 byte(?))
++ Program memory
 + Similarity of system interrupts
 + Cool editor with the ability to save code
 
