@@ -1,0 +1,5 @@
+"VertexlitGeneric"
+{
+	"$basetexture" "models/conred/floppy_texture"
+	"$bumpmap" "models/conred/floppy_texture_bump"
+}

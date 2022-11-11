@@ -1,0 +1,1 @@
+gTASM = gTASM or {}
