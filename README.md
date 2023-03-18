@@ -13,7 +13,7 @@ What gTASM adds to the computer:
 + Complete recycling of old verson
 + Program memory
 + Similarity of system interrupts
-+ Cool editor with the ability to save code
++ Cool code editor
 
 
 #### Social links
