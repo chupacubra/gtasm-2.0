@@ -3,6 +3,8 @@ local timer = timer;
 local OS = OS;
 local delay = 0
 
+print(include("gterminal/gtasm/sv_main.lua"))
+
 local function IsEmpty(t)
     if not t then
         return true
@@ -12,6 +14,7 @@ local function IsEmpty(t)
     end
     return true
 end
+
 OS:NewCommand(":help", function(client, entity, arguments)
 	gTerminal:Broadcast(entity, "=============================");
 	gTerminal:Broadcast(entity, "  PersonalOS Help Menu");
@@ -556,8 +559,8 @@ OS:NewCommand(":disk",function(client,entity,arguments)
 			local disk = ents.Create( "sent_disk" )
 			disk:SetPos( entity:LocalToWorld(Vector(0,0,25)) )
 			disk:SetData(entity.DiskData)
-      disk:SetNameD(entity.DiskName)
-      disk:SetOwner(entity.DiskO)
+			disk:SetNameD(entity.DiskName)
+			disk:SetOwner(entity.DiskO)
 			disk:Spawn()
 			entity.Disk = nil
 		else

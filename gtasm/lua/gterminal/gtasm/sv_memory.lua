@@ -12,6 +12,7 @@ local arrhex = {
     "F",
 }
 
+local zero = "00000000"
 function hval(hex)
     local str = ""
     for k,v in pairs(hex) do
@@ -53,6 +54,39 @@ function printMemBlock(arr,len)
     end
 end
 
+function strMemBlock(arr,len)
+    local llen = len / 16
+    local ii = 0
+    local str = ""
+    local hp = {}
+    local str_i = 0
+    local str_arr = {}
+    for i = 1,len do
+        str = str .. arr[i]
+        table.insert(hp,arr[i])
+        ii = ii + 1
+        if ii == 8 then
+            local tbl = tobase(digitsToNum(hp,2),16)
+            local hex = hval(tbl)
+            
+            if string.len(hex) < 2 then
+                if string.len(hex) == 1 then
+                    hex = hex .." "
+                elseif string.len(hex) == 0 then
+                    hex = hex .."  "
+                end
+            end
+            
+            table.insert(str_arr,{str_i .." = "..str.."  "..hex})
+            hp = {}
+            ii = 0
+            str_i = str_i + 1
+            str = ""
+        end
+    end
+    return str_arr
+end
+
 tlen = function(table)
    local count = 0
     for _,_ in pairs(table) do
@@ -89,9 +123,15 @@ tobase = function(num, base, forcedLength)
     for i = 1, length do
         local v = num % base
         t[l - i + 1] = v
-        --if num < base then break end
         num = math.floor(num / base)
     end
+    
+    if forcedLength != nil and forcedLength < #t then
+        while forcedLength != #t do
+            table.remove(t,1)
+        end
+    end
+
     return t
 end
 
@@ -121,26 +161,32 @@ function BlockMem:New(size)
         return idd,(pos * 8)
     end
 
-    function obj:ReadS(pos,int,conv)
+    function obj:ReadS(pos, byte)
         local dgt,dpos = self:SegPos(pos)
-        --if dgt > #dgt then
-          --  return "00000000"
-        --end
+
         if dpos >= 40 then
             dpos = dpos - 40
             dgt = dgt + 1
         end
+
         local data = self.data[dgt]
-        local arr = tobase(data,2,64)
+        local arr = tobase(data, 2, 64)
         local arrm = {}
         local rez = {}
 
-        for i = 1,8 do
-
+        for i = 1, 8 * (byte or 1) do
+            if dpos >= 40 then
+                dpos = 0 - (i-1)
+                if #self.data < dgt+1 then
+                    return false
+                end
+                data = self.data[dgt+1]
+                arr = tobase(data, 2, 64)
+            end
             rez[i] = arr[dpos + i]
         end
 
-        return table.concat(rez)
+        return table.concat(rez),byte or nil
     end
 
     function obj:WriteS(pos,val)
@@ -157,6 +203,9 @@ function BlockMem:New(size)
 
         for i = 1,#val do
             if dpos + i > 40 then
+                if #self.data < dgt+1 then
+                    return false
+                end
                 table.insert(arrm,{arr,dgt})
                 arr = tobase(self.data[dgt + 1],2,64)
                 dgt = dgt + 1
@@ -174,6 +223,7 @@ function BlockMem:New(size)
 
             self.data[dgt] = digitsToNum(arr,2)
         end
+
     end
 
     function obj:PrintVal()
@@ -189,11 +239,11 @@ function BlockMem:New(size)
     self.__index = self; return obj
 end
 
-function BankMem:Create(array)
+function BankMem:Create(array, eid)
     local obj = {}
     obj.bdata = {}
     obj.bdsize = -1
-
+    obj.eid = eid
     for k,v in pairs(array) do
         local size = v[2] / 8
         local bit_size = v[2]
@@ -213,13 +263,30 @@ function BankMem:Create(array)
         return self.bdsize
     end
 
+    function obj:InsertNew(array)
+        for k,v in pairs(array) do
+            local size = v[2] / 8
+            local bit_size = v[2]
+            local name = v[1]
+    
+            table.insert(obj.bdata,{
+                id = name,
+                b_start = obj.bdsize + 1,
+                b_end = obj.bdsize + size,
+                b_size = size,
+                block = BlockMem:New(bit_size),
+            })
+            obj.bdsize = obj.bdsize + size 
+        end
+    end
+
     function obj:BlockPos(apos)
         local pos = tonumber(apos)
         if pos > self.bdsize then
-            return 0,"big"
+            return -1
         end
         if pos < 0 then
-            return 0, "small"
+            return -1
         end
 
         local posb      = pos
@@ -240,27 +307,49 @@ function BankMem:Create(array)
         return block_idp,posb
     end
 
-    function obj:ReadS(pos,int)
-        local bpos,pos = self:BlockPos(pos)
+    function obj:ReadS(posa, byte)
+        if posa == nil then
+            return zero
+        end
+        local bpos,pos = self:BlockPos(posa)
+        if bpos == -1 then
+            self:ErrorM({posa,byte})
+            return zero
+        end
         local block = self.bdata[bpos]["block"]
-        local dat = block:ReadS(pos,int)
-
+        local dat = block:ReadS(pos,byte)
+        
+        if dat == false then
+            self:ErrorM({posa,byte})
+            return zero
+        end
+        
         return dat
     end
 
-    function obj:WriteS(pos,val)
-        local bpos,apos = self:BlockPos(pos)
-        
-        self.bdata[bpos]["block"]:WriteS(apos,val)
+    function obj:WriteS(posa,val)
+        local bpos,apos = self:BlockPos(posa)
+        if bpos == -1 then
+            self:ErrorM({posa,byte})
+            return zero
+        end
+        local succes = self.bdata[bpos]["block"]:WriteS(apos,val)
+        if succes == false then
+            self:ErrorM({posa,byte})
+        end
     end
 
     function obj:GetBlock(name)
-        for k,v in pairs(self.bdata) do
-            if v.id == name then
-                return v.block
+        if type(name) == "string" then
+            for k,v in pairs(self.bdata) do
+                if v.id == name then
+                    return v.block
+                end
             end
+        else
+            return self.bdata[name] or false
         end
-        return 0
+        return false
     end
 
     function obj:GetAllBLocks()
@@ -274,12 +363,18 @@ function BankMem:Create(array)
             end
         end
     end
+
     function obj:GetBoardBlock(name)
         for k,v in pairs(self.bdata) do
             if v.id == name then
                 return v.b_start, v.b_end 
             end
         end
+    end
+    
+    function obj:ErrorM(arg)
+        debug.Trace()
+        hook.Call("gTASM","MemoryIndexE", self.eid,arg)
     end
     setmetatable(obj, self)
     self.__index = self; return obj

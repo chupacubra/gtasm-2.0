@@ -317,7 +317,7 @@ function lexer(text)
 				pushToken('value')
 			else
 				if char == "$" then
-					pushToken('variable')
+					pushToken('memtype')
 				else
 					pushToken('ident')
 				end 

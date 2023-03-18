@@ -1,52 +1,51 @@
 include("sv_sysinter.lua")
 gTASM = gTASM or {}
---[[
-local function ConvertString(str)  
-    local function comp(...)
-        return {...}
+
+function gTASM:ToVar(entity,argum)
+    local var_list = {}
+
+    for k,v in pairs(argum) do
+        local fin = {}
+        if k == "label" then
+            var_list.label = v
+            continue
+        end
+
+        if v.n_type < GTASM_ALLMEM then
+            table.insert(var_list,v)
+
+        elseif v.n_type == GTASM_STR then
+            table.insert(var_list,v)
+
+        elseif v.n_type > GTASM_ALLMEM then
+            local addr,db = gTASM:GetAddresMem(entity,v)
+            local var = 0
+
+            if db then
+                var = addr
+            else
+                var = tonumber(entity.BANK:ReadS(addr,v.byte_size or 1), 2)
+            end
+
+            fin.data = var
+            fin.mem_addres = addr
+            fin.n_type = v.n_type
+            fin.byte_size = v.byte_size
+
+            table.insert(var_list, fin)
+        end
     end
 
-    local rez = comp(string.byte(str, 1,string.len(str)))
-    return rez
+    return var_list
 end
 
-local function ISDB(entity,name)
-    if entity.dbLabel.dbList[name] then
-        return true
-    end
-    return false
-end
-
-local function to8int(vall)
-    local val = tonumber(vall) 
-	while val > 255 do
-		val = val - 255
-	end
-	while val < 0 do
-		val = val + 255
-	end
-    return tobase(tonumber(val),2,8)
-end
-
-local function strtonum(str)
-    if string.len(str) == 0 then return 0 end
-
-    local arr = string.ToTable(str)
-
-    for k,v in pairs(arr) do
-        local ch = string.byte(arr[k])
-        local bn  = table.concat(to8int(ch))
-        arr[k] = bn
-    end
-    
-    return table.concat()
-end
-
---]]
 function gTASM:GetAddresMem(ent,arg)
+
     if arg.n_type == GTASM_REG then
         if ent.regLabel[arg.data] then
             return ent.regLabel[arg.data]
+        elseif arg.mem_addres then
+            return arg.mem_addres
         elseif ent.dbLabel.dbList[arg.data] then
             return ent.dbLabel.dbList[arg.data]["posStart"]
         end
@@ -61,25 +60,36 @@ function gTASM:GetAddresMem(ent,arg)
         elseif arg.data[1]["n_type"] > GTASM_ALLMEM then
             local addr = gTASM:GetAddresMem(ent,arg.data[1])
 
+            local addresbyte = arg.byte_size
+            local argbyte = 1
+            if arg.data[1]["byte_size"] != nil then
+                argbyte = arg.data[1]["byte_size"]
+            end
+            
             local isdb = ISDB(ent,arg.data[1]["data"])
             local rez
 
             if isdb then
                 rez = addr
             else
-                rez = tonumber(ent.BANK:ReadS(addr,1),2)
+                rez = tonumber(ent.BANK:ReadS(addr,argbyte or 1),2)
             end
+
             return rez,isdb
         end
     end
+
 end
 
-function gTASM:ExecuteCommand(ent,cmd)
-    local name = cmd.oper
+function gTASM:ExecuteCommand(ent, cmd)
+    if cmd.oper == nil then
+        return
+    end
+    local name = string.lower(cmd.oper)
     local arg  = cmd.arg
 
     if self.cmds[name] == nil then
-        return  0
+        return  4,{CMD_E = name}
     end
 
     local allowtype = self.cmds[name]["tval"]
@@ -99,11 +109,15 @@ function gTASM:ExecuteCommand(ent,cmd)
         end
     else
         for k,v in pairs(arg) do
+            if v.n_type == "string" and allowtype.no_string then
+                return 6,{ARG_ID = k}
+            end
+
             for a,b in pairs(allowtype[k]) do
                 if b == GTASM_ALL or b == GTASM_NOALL then
                     break
                 end
-
+                
                 if b == GTASM_ALLNUM then
                     if v.n_type < GTASM_ALLNUM then
                         break
@@ -118,7 +132,9 @@ function gTASM:ExecuteCommand(ent,cmd)
             end
         end
     end
-    local result = self.cmds[name]["func"](ent,arg) -- OK == 1,0, ERR == -1,NUM_ERROR
+
+    local table_arg = gTASM:ToVar(ent, arg)
+    local result = self.cmds[name]["func"](ent,table_arg)
 end
 
 
@@ -134,243 +150,190 @@ function gTASM:NewOper(name,dtype,tval,f)
 end
 
 
+
 gTASM:NewOper("mov","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var,from
+    local addr = arg[1]["mem_addres"]
+    local value = arg[2]["convert"] or arg[2]["data"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-
-        if arg[2]["n_type"] == GTASM_STR then
-            var = strtonum(arg[2]["data"])
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
-
-    else
-        local fromaddr,db = gTASM:GetAddresMem(entity,arg[2])
-        
-        if db then
-            var = fromaddr
-        else
-            var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-        end
-        from = fromaddr
-    end
-
-    entity.BANK:WriteS(toaddr,to8int(var))
+    entity.BANK:WriteS(addr, tobinval(value, arg[2]["byte_size"]))
 end)
 
-
-gTASM:NewOper("add","Math",{
+gTASM:NewOper("add","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local val1 = arg[1]["convert"] or arg[1]["data"]
+    local val2 = arg[2]["convert"] or arg[2]["data"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
-
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
+    local val = val1 + val2
+    local byte_size = arg[2]["byte_size"] or 1
+    if val > 2 ^ (8 * byte_size) then
+        gTASM:SetRegister(entity,"CF",1)
     else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
+        gTASM:SetRegister(entity,"CF",0)
     end
 
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(var2 + var))
+    entity.BANK:WriteS(addr, tobinval(val, byte_size))
 end)
 
-
-gTASM:NewOper("sub","Math",{
+gTASM:NewOper("sub","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local val1 = arg[1]["convert"] or arg[1]["data"]
+    local val2 = arg[2]["convert"] or arg[2]["data"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
+    local val = val1 - val2
 
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
+    if val < 0 then
+        gTASM:SetRegister(entity, "CF",1)
     else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
+        gTASM:SetRegister(entity, "CF",0)
     end
 
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(var2 - var))
+    entity.BANK:WriteS(addr, tobinval(val, arg[1]["byte_size"]))
 end)
 
-gTASM:NewOper("mul","Math",{
+gTASM:NewOper("sbb","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
+    local addr = arg[1]["mem_addres"]
+    local val1 = arg[1]["convert"] or arg[1]["data"]
+    local val2 = arg[2]["convert"] or arg[2]["data"]
+    local cf =  gTASM:GetRegister(entity, "CF")
 
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
+    local val = val1 - val2 - cf
+
+    if val < 0 then
+        gTASM:SetRegister(entity, "CF",1)
     else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
+        gTASM:SetRegister(entity, "CF",0)
     end
 
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(var2 * var))
+    entity.BANK:WriteS(addr, tobinval(val,arg[1]["byte_size"]))
 end)
 
-gTASM:NewOper("div","Math",{
+gTASM:NewOper("adc","Math",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-    {GTASM_ALL}
+    {GTASM_ALL},
+    no_string = true
+
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local var1 = arg[1]["convert"] or arg[1]["data"]
+    local var2 = arg[2]["convert"] or arg[2]["data"]
+    local cf =  gTASM:GetRegister(entity, "CF")
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
+    local val = var1 + var2 + cf
+    local byte_size = arg[1]["byte_size"] or 1
 
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
+    if val > 2 ^ (8 * byte_size) then
+        gTASM:SetRegister(entity, "CF",1)
     else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
+        gTASM:SetRegister(entity, "CF",0)
     end
 
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(math.floor(var2 / var)))
+    entity.BANK:WriteS(addr, tobinval(val, arg[1]["byte_size"]))
 end)
+
 
 gTASM:NewOper("and","Math",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local var1 = arg[1]["data"]
+    local var2 = arg[2]["data"] or arg[2]["convert"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
-
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
-    else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-    end
-
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(bit.band( var2 , var)))
+    entity.BANK:WriteS(addr, tobinval(bit.band(var2 , var1), arg[1]["byte_size"]))
 end)
 
 gTASM:NewOper("or","Math",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local var1 = arg[1]["data"]
+    local var2 = arg[2]["data"] or arg[2]["convert"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
-
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
-    else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-    end
-
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(bit.bor(var2 ,var)))
+    entity.BANK:WriteS(addr, tobinval(bit.bor(var2 , var1), arg[1]["byte_size"]))
 end)
 
 gTASM:NewOper("xor","Math",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
     {GTASM_ALL}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var
+    local addr = arg[1]["mem_addres"]
+    local var1 = arg[1]["data"]
+    local var2 = arg[2]["data"] or arg[2]["convert"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] == GTASM_STR then
-
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
-    else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-    end
-
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(bit.bxor(var2 , var)))
+    entity.BANK:WriteS(addr, tobinval(bit.bxor(var2 , var1), arg[1]["byte_size"]))
 end)
 
-gTASM:NewOper("inc","Math",{
-    {GTASM_VAR, GTASM_REG, GTASM_ADDR}
-},function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(var2 + 1))
-end)
-
-gTASM:NewOper("dec","Math",{
-    {GTASM_VAR, GTASM_REG, GTASM_ADDR}
-},function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
-    entity.BANK:WriteS(toaddr,to8int(var2 - 1))
-end)
-
-gTASM:NewOper("rand","Math",{
-    {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-},function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-
-    entity.BANK:WriteS(toaddr,to8int(math.random(0, 100)))
-end)
 
 gTASM:NewOper("not","Math",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR}
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
-    local var2 = tonumber(entity.BANK:ReadS(toaddr,1),2)
+    local addr = arg[1]["mem_addres"]
+    local var  = arg[1]["data"]
 
-    entity.BANK:WriteS(toaddr,to8int(bit.bnot(var2)))
+    entity.BANK:WriteS(addr,bin_not(tobinval(var, arg[1]["byte_size"])))
+end)
+
+gTASM:NewOper("inc","Memory",{
+    {GTASM_VAR, GTASM_REG, GTASM_ADDR},
+    {GTASM_ALL}
+},function(entity,arg)
+    local addr = arg[1]["mem_addres"]
+    local val1 = arg[1]["convert"] or arg[1]["data"]
+
+    local val = val1 + 1
+    local byte_size = arg[1]["byte_size"] or 1
+
+    if val > 2 ^ (8 * byte_size) then
+        gTASM:SetRegister(entity,"CF",1)
+    else
+        gTASM:SetRegister(entity,"CF",0)
+    end
+
+    entity.BANK:WriteS(addr, tobinval(val,arg[1]["byte_size"]))
+end)
+
+gTASM:NewOper("dec","Memory",{
+    {GTASM_VAR, GTASM_REG, GTASM_ADDR},
+    {GTASM_ALL}
+},function(entity,arg)
+    local addr = arg[1]["mem_addres"]
+    local val1 = arg[1]["convert"] or arg[1]["data"]
+
+    local val = val1 - 1
+    local byte_size = arg[1]["byte_size"] or 1
+    if val > 2 ^ (8 * byte_size) then
+        gTASM:SetRegister(entity,"CF",1)
+    else
+        gTASM:SetRegister(entity,"CF",0)
+    end
+
+    entity.BANK:WriteS(addr, tobinval(val,arg[1]["byte_size"]))
 end)
 
 gTASM:NewOper("cmp","Logic",{
     {GTASM_ALL},
     {GTASM_ALL}
 },function(entity,arg)
-    local addr1 = gTASM:GetAddresMem(entity,arg[1])
-    local var1 = tonumber(entity.BANK:ReadS(addr1,1),2)
-    local var
+    local addr = arg[1]["mem_addres"]
+    local var1 = arg[1]["data"]
+    local var2 = arg[2]["convert"] or arg[2]["data"]
 
-    if arg[2]["n_type"] < GTASM_ALLMEM then
-        if arg[2]["n_type"] < GTASM_ALLNUM then
-            var = arg[2]["convert"] or arg[2]["data"]
-        else
-            var = arg[2]["convert"] or arg[2]["data"]
-        end
-    else
-        local fromaddr = gTASM:GetAddresMem(entity,arg[2])
-        var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-    end
 
-    var1 = var1 - var
+    var1 = var1 - var2
+    
     local zf,cf
     if var1 == 0 then
         zf = 1
@@ -382,18 +345,15 @@ gTASM:NewOper("cmp","Logic",{
         zf = 0
         cf = 0
     end
-
-    entity.BANK:WriteS(entity.regLabel.CF,to8int(cf))
-    entity.BANK:WriteS(entity.regLabel.ZF,to8int(cf))
-
-    entity.FLAGS.cf = cf
-    entity.FLAGS.zf = zf
+    gTASM:SetRegister(entity,"CF",cf)
+    gTASM:SetRegister(entity,"ZF",zf)
 end)
 
 gTASM:NewOper("db","Memory",{
-    {GTASM_ALL}, -- no ne pamyat
+    {GTASM_ALL},
     size_nolimit = true
 },function(entity,arg)
+
     local rez = {}
     local labl
 
@@ -403,25 +363,30 @@ gTASM:NewOper("db","Memory",{
     end
 
     for k,v in pairs(arg) do
-        if v.n_type < GTASM_ALLNUM then
-            table.insert(rez,to8int(v.convert or tonumber(v.data)))
-
-        elseif v.n_type == GTASM_STR then
-            local str = ConvertString(v.data[1]["data"])
-
+        if v.n_type == GTASM_STR then
+            local str = ConvertString(v.data)
+            
             for k,v in pairs(str) do
                 table.insert(rez,to8int(v))
             end
+        else
+            local data = v.convert or v.data
 
+            local bdat = tobinval(data,v.byte_size, true)
+
+            for k,v in pairs(bdat) do
+                table.insert(rez,v)
+            end
         end
     end
+
     gTASM:InsertDBInMemory(entity,rez,labl)
 end)
 
 gTASM:NewOper("jmp","Logic",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"]
     if entity.jumpLabel[label] then
         entity.str_i = entity.jumpLabel[label]
     end
@@ -430,9 +395,11 @@ end)
 gTASM:NewOper("je","Logic",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"]
+
     if entity.jumpLabel[label] then
-        if entity.FLAGS.zf == 1 then
+        local zf = gTASM:GetRegister(entity,"ZF")
+        if tonumber(zf,2) == 1 then
             entity.str_i = entity.jumpLabel[label]
         end
     end
@@ -441,9 +408,11 @@ end)
 gTASM:NewOper("jne","Logic",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"][1]
+
     if entity.jumpLabel[label] then
-        if entity.FLAGS.zf == 0 then
+        local zf = gTASM:GetRegister(entity,"ZF")
+        if tonumber(zf,2) == 0 then
             entity.str_i = entity.jumpLabel[label]
         end
     end
@@ -452,21 +421,25 @@ end)
 gTASM:NewOper("jb","Logic",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"]
     if entity.jumpLabel[label] then
-        if entity.FLAGS.cf == 1 then
+        local cf = gTASM:GetRegister(entity,"CF")
+
+        if tonumber(cf,2) == 1 then
             entity.str_i = entity.jumpLabel[label]
         end
-    else
     end
 end)
 
 gTASM:NewOper("ja","Logic",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"]
     if entity.jumpLabel[label] then
-        if entity.FLAGS.cf == 0  and entity.FLAGS.zf == 0 then
+        local cf = tonumber(gTASM:GetRegister(entity,"CF"),2)
+        local zf = tonumber(gTASM:GetRegister(entity,"ZF"),2)
+
+        if cf == 0  and zf == 0 then
             entity.str_i = entity.jumpLabel[label]
         end
     end
@@ -475,76 +448,44 @@ end)
 gTASM:NewOper("int","Interrupt",{
     {GTASM_ALLNUM},
 },function(entity,arg)
-    local id = arg[1]["convert"] or tonumber(arg[1]["data"])
+    local id = arg[1]["convert"] or arg[1]["data"]
 
     gTASM:SysInterrupt(entity,id)
 end)
 
+
 gTASM:NewOper("push","memory",{
     {GTASM_ALL},
 },function(entity,arg)
-    local var
-    if arg[1]["n_type"] < GTASM_ALLMEM then
-        if arg[1]["n_type"] == GTASM_STR then
+    local var = arg[1]["data"]
 
-        else
-            var = arg[1]["convert"] or arg[1]["data"]
-        end
-    else
-        local fromaddr,db = gTASM:GetAddresMem(entity,arg[1])
-        if db then
-            var = fromaddr
-        else
-            var = tonumber(entity.BANK:ReadS(fromaddr,1),2)
-        end
-    end
-
-    
-    local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
-    local stack_stat = tonumber(entity.BANK:ReadS(entity.regLabel.SP,1),2)
-    entity.BANK:WriteS(serv_start + stack_stat, to8int(var))
-    entity.BANK:WriteS(entity.regLabel.SP, to8int(stack_stat + 1))
+    gTASM:StackPush(entity, var, arg[1]["byte_size"] or 1)
 end)
 
 gTASM:NewOper("pop","memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
 },function(entity,arg)
-    local toaddr = gTASM:GetAddresMem(entity,arg[1])
+    local addr = arg[1]["mem_addres"]
+    local var = gTASM:StackPop(entity, arg[1]["byte_size"])
 
-    local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
-    local stack_stat = tonumber(entity.BANK:ReadS(entity.regLabel.SP,1),2)
-
-    if stack_stat != 0 then
-        stack_stat = stack_stat - 1
-    end
-
-    local var = tonumber(entity.BANK:ReadS(serv_start + stack_stat,1),2)
-
-    entity.BANK:WriteS(toaddr,to8int(var))
-    entity.BANK:WriteS(entity.regLabel.SP,to8int(stack_stat))
-    entity.BANK:WriteS(serv_start+stack_stat,to8int(0))
+    entity.BANK:WriteS(toaddr, tobinval(var,arg[1]["byte_size"]))
 end)
 
 gTASM:NewOper("call","Procces",{
     {GTASM_STR},
 },function(entity,arg)
-    local label = arg[1]["data"][1]["data"]
+    local label = arg[1]["data"]
     if entity.jumpLabel[label] then
-        entity.BANK:WriteS(entity.regLabel.CR,to8int(entity.str_i))
+        gTASM:StackPush(entity, entity.str_i, 2)
         entity.str_i = entity.jumpLabel[label]
-        --print("JUMP TO "..label)
-    else
-        --error
     end
 end)
 
 gTASM:NewOper("ret","Procces",{
-    {GTASM_NOARG},
+    {GTASM_ALLNUM},
 },function(entity,arg)
-    local str_i = tonumber(entity.BANK:ReadS(entity.regLabel.CR),2)
-    if str_i != 0 then
-    entity.str_i = str_i
-    --print("JUMP TO "..str_i)
-    end
-
+    --local label = arg[1]["data"]  arg[1]["convert"] or arg[1]["data"]
+    local i = gTASM:StackPop(entity,2)
+    print("FROM stack",i)
+    entity.str_i = i
 end)

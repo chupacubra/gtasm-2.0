@@ -1,4 +1,4 @@
-include("sh_init.lua");
+include("sh_init_t.lua")
 include("cl_luapad_editor.lua")
 
 luapad = {}
@@ -6,6 +6,10 @@ luapad = {}
 local newFileText = "\n# A list with all the commands on the site [LINK]\n# Need help with something?->\n# try asking in [DISCORD/ICQ/IRC/SMS]"
 
 local function gTASMSaveFile(name,data)
+	if file.IsDir( "gtasm", "DATA" ) == false then
+		file.CreateDir("gtasm")
+		MsgC(Color(0, 255, 0), "Created gtasm directory\n");
+	end
 	local newFile = file.Open(name, "w", "DATA")
 
 	if newFile != nil then
@@ -13,7 +17,7 @@ local function gTASMSaveFile(name,data)
 	end
 
 	newFile:Close()
-	local succes = file.Exists( name, "DATA" ) -- bruh
+	local succes = file.Exists( name, "DATA" )
 
 	return succes
 end
@@ -23,9 +27,9 @@ local function RecursiveGetFiles(path,str)
 	local files,dir = file.Find(path.."/*","DATA")
 	for k,v in pairs(files) do
 		if str != nil then
-		if string.match(v,str) then
-			table.insert(allFiles,v)
-		end
+			if string.match(v,str) then
+				table.insert(allFiles,v)
+			end
 		else
 			table.insert(allFiles,v)
 		end
@@ -33,10 +37,16 @@ local function RecursiveGetFiles(path,str)
 	if #dir != 0 then
 		for k,v in pairs(dir) do
 			local fls = RecursiveGetFiles(path.."/"..v,str)
-			allFiles[v] = fls
+			if #fls != 0 then
+				allFiles[v] = fls
+			end
 		end
 	end
 	return allFiles
+end
+
+local function FindFile(name)
+	return RecursiveGetFiles("gtasm",name) --brubh
 end
 
 local function dsplit(s, delimiter)
@@ -51,12 +61,8 @@ local function dsplit(s, delimiter)
 end
 
 local function CallRedDerm(entity,cont,name)
-	local function DMCreateFile()
-
-	end
-
-	local function DMRemoveFile()
-
+	if cont then
+		cont = string.gsub(cont, "\r", "")
 	end
 
 	local frame = vgui.Create( "DFrame" )
@@ -111,6 +117,10 @@ local function CallRedDerm(entity,cont,name)
 	BGuide:SetSize(18,18)
 	BGuide:SetIcon( "icon16/book_open.png" )
 	BGuide:SetToolTip("HOW PROGRAMMING ON THIS $%@?")
+
+	function BGuide:DoClick()
+		LocalPlayer():ConCommand("gt_htw")
+	end
 
 	local BSet = BMisc:Add("DImageButton")
 	BSet:SetSize(18,18)
@@ -178,11 +188,6 @@ local function CallRedDerm(entity,cont,name)
 	BSearch:Dock( TOP )
 	BSearch:SetPlaceholderText("Search files...")
 
-	function BSearch:OnEnter()
-		FindFile(self:GetValue())
-		chat.AddText( self:GetValue() )
-	end
-
     local DTree = vgui.Create( "DTree", DBrowser )
     DTree:Dock(FILL)
 	DTree.SelNode = nil
@@ -200,6 +205,7 @@ local function CallRedDerm(entity,cont,name)
 				DTree.SelNode = node
 			else
 				local file = file.Read( node:GetFileName(), "DATA" )
+				file = string.gsub(file,"\r","")
 				if ESheet.LFile[node:GetFileName()] then
 					ESheet:SwitchToName(node:GetFileName())
 				else
@@ -210,6 +216,56 @@ local function CallRedDerm(entity,cont,name)
 			end
 		end
 		DNode:SetExpanded(true)
+	end
+
+	function DTree:DrawFindTable(pathtbl)
+		local function getkey(p)
+			for k,_ in pairs(p) do
+				return k
+			end
+		end
+		
+		local function getNodeName(node,name)
+			local tbl = node:GetChildNodes()
+			for k,v in pairs(tbl) do
+				if v:GetText() == name then
+					return v
+				end
+			end
+			return false
+		end
+
+
+		local spath = ""
+		local searchnode = DNode
+		local break_iter = 0 
+
+		while true do
+			local key = getkey(pathtbl)
+			if type(pathtbl[key]) == "table" then
+				local spath = spath..key.."/"
+				pathtbl = pathtbl[key]
+				searchnode = getNodeName(searchnode, key)
+				
+				if searchnode == false then
+					break
+				end
+			else
+				local spath = spath..key
+				searchnode = getNodeName(searchnode, pathtbl[key])
+				break
+			end
+			break_iter = break_iter + 1
+			if break_iter > 30 then
+				break
+			end
+		end
+
+		if searchnode == false then
+			return
+		end
+
+		searchnode:ExpandTo(true)
 	end
 
 	function DTree:GetDirPath(node)
@@ -309,6 +365,7 @@ local function CallRedDerm(entity,cont,name)
 			
 			menu:AddOption( "Open file", function()
 				local file = file.Read( node:GetFileName(), "DATA" )
+				file = string.gsub(file,"\r","")
 				if ESheet.LFile[node:GetFileName()] then
 					ESheet:SwitchToName(node:GetFileName())
 				else
@@ -337,11 +394,9 @@ local function CallRedDerm(entity,cont,name)
 					"newfile",
 					function(text)
 						local fold = node:GetParentNode():GetFolder()
-						print(fold.."/"..text..".txt",node:GetFileName())
 						if file.Exists( fold.."/"..text..".txt", "DATA" ) then
 							Derma_Message("The file with this name already existed", "Error of creating file", "OK")
 							return
-						--file.CreateDir( node:GetFolder().."/"..text )
 						end
 						file.Rename( node:GetFileName(), fold.."/"..text..".txt" )
 						self:SetupFileList()
@@ -377,9 +432,7 @@ local function CallRedDerm(entity,cont,name)
 	end
 
 	function RemB:DoClick()
-		PrintTable(ESheet.LFile)
 		if ESheet:GetActiveTab():GetPanel().ValueChanged then
-			print(ESheet:GetActiveTab():GetPanel().ValueChanged)
 			Derma_Query(
 				"Need save file?",
 				"Confirmation:",
@@ -491,7 +544,6 @@ local function CallRedDerm(entity,cont,name)
 							end,
 							"Nooo!!!",
 							function()
-								--nothing
 							end
 						)
 					else
@@ -514,17 +566,28 @@ local function CallRedDerm(entity,cont,name)
 	end
 
 	function UplB:DoClick()
-		--local name = table.concat()
 		hook.Run("gT_SaveScript",entity, ESheet:GetActiveTab():GetPanel().name, ESheet:GetActiveTab():GetPanel():GetValue())
 	end
+
+	function BSearch:OnEnter()
+		if self:GetValue() == "" then
+			return
+		end
+
+		local path = FindFile(self:GetValue())
+
+		if !table.IsEmpty(path) then
+			DTree:DrawFindTable(path)
+		end
+	end
+
 end
-
-
 
 net.Receive("gT_RedDerm", function()
 	local entity = net.ReadEntity()
 	local cont = net.ReadString()
 	local name = net.ReadString()
+
 	CallRedDerm(entity,cont,name)
 end)
 

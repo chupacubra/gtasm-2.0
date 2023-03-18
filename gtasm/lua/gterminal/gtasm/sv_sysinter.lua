@@ -1,26 +1,5 @@
 gTASM = gTASM or {}
---[[
-local function RestoreString(val)
-    local str = ""
-    for k,v in pairs(val) do
-        if tonumber(v,2) > 32 then
-            str = str .. string.char(tonumber(v,2))
-        else
-            str = str .. " "
-        end
-    end
-    return str
-end
 
-local function ConvertString(str)
-    local function comp(...)
-        return {...}
-    end
-
-    local rez = comp(string.byte(str, 1,string.len(str)))
-    return rez
-end
---]]
 --[[
     1- stop script
     2- clear screen
@@ -41,32 +20,32 @@ end
     ???- ...
 ]]--
 gTASM.InterList = {
-    function(ent,arg)
-        if !ent then
-            return 0
+    function(entity,arg)
+        if !entity then
+            return {0,1}
         end
-        gTerminal:EndScript(entity)
+        gTASM:ErrorScript(entity, GT_E_STOP, {NO_ARG = 0})
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return 0
         end
         for i = 0, 25 do
-            gTerminal:Broadcast(ent, "", MSG_COL_NIL, i);
+            gTerminal:Broadcast(entity, "", MSG_COL_NIL, i);
         end;
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,15}
         end
         local text = RestoreString(arg)
-        gTerminal:Broadcast(ent,text,GT_COL_SUCC)
+        gTerminal:Broadcast(entity, text, GT_COL_SUCC)
     end,
     
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,2}
         end
         
@@ -74,11 +53,11 @@ gTASM.InterList = {
         local y = tonumber(arg[2],2)
         local char = string.char(tonumber(arg[3],2))
 
-        gTerminal:Broadcast(ent, char, GT_COL_MSG, y, x)
+        gTASM:FillBroadcast(entity, char, GT_COL_MSG, y, x)
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,18}
         end
         
@@ -89,86 +68,88 @@ gTASM.InterList = {
 
         local str = RestoreString(arg)
 
-        gTerminal:Broadcast(ent, str, GT_COL_MSG, y, x)
+        gTASM:FillBroadcast(entity, str, GT_COL_MSG, y, x)
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,1}
         end
-        --print("print the str")
-        local adres = tonumber(arg[1],2)
+        local adres = tonumber(arg[1]..arg[2],2)
 
         local str = {}
-        local char = ent.BANK:ReadS(adres,1)
-        while string.char(tonumber(char,2)) != "$" or tonumber(char,2) == 0 do
+        local char = entity.BANK:ReadS(adres,1)
+
+        while tonumber(char, 2) != 36 and tonumber(char, 2) != 0 do -- 36 -> "$"
             table.insert(str,char)
             adres = adres + 1
-            char = ent.BANK:ReadS(adres,1)
+            char = entity.BANK:ReadS(adres, 1)
         end
-        gTerminal:Broadcast(ent,RestoreString(str))
+
+        gTerminal:Broadcast(entity,RestoreString(str))
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,1}
         end
 
         local max_len = tonumber(arg[1],2)
         local adress  = tonumber(arg[2],2)
 
-        if !ent.FLAGS.inp then
-            ent.FLAGS.inp = true
-            ent.BANK:WriteS(ent.regLabel.INP,to8int(1))
-            gTerminal:GetInput(ent, function(ply, arg)
+        if !entity.FLAGS.inp then
+            entity.FLAGS.inp = true
+            entity.BANK:WriteS(entity.regLabel.INP,to8int(1))
+            gTerminal:GetInput(entity, function(ply, arg)
                 local str = string.Left(table.concat(arg), max_len)
                 local var = ConvertString(str)
 
                 for k,v in pairs(var) do
-                    ent.BANK:WriteS(adress,to8int(v))
+                    entity.BANK:WriteS(adress,to8int(v))
                     adress = adress + 1
                 end
-                ent.FLAGS.inp = false
-                ent.BANK:WriteS(ent.regLabel.INP,to8int(0))
+                entity.FLAGS.inp = false
+                entity.BANK:WriteS(entity.regLabel.INP,to8int(0))
             end)
 
         end
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return 0
         end
 
-        if !ent.FLAGS.ink then
-            ent.FLAGS.ink = true
+        if !entity.FLAGS.ink then
+            entity.FLAGS.ink = true
             
-            gTerminal:StartKeyType(ent,ent:GetUser())
-            ent.BANK:WriteS(ent.regLabel.INK,to8int(1))
+            gTerminal:StartKeyType(entity,entity:GetUser())
+            entity.BANK:WriteS(entity.regLabel.INK,to8int(1))
         end
     end,
 
-    function(ent,arg)
-        if !ent then
-            return {0,2}
+    function(entity,arg)
+        if !entity then
+            return {0,3}
         end
-        --print("print the str")
-        local adres = tonumber(arg[1],2)
-        local x = tonumber(arg[2],2)
-        local y = tonumber(arg[3],2)
-        
+        local adres = tonumber(arg[1]..arg[2],2)
+        local x = tonumber(arg[3],2)
+        local y = tonumber(arg[4],2)
+
         local str = {}
-        local char = ent.BANK:ReadS(adres,1)
-        while string.char(tonumber(char,2)) != "$" or tonumber(char,2) == 0 do
+        local char = entity.BANK:ReadS(adres,1)
+
+        while tonumber(char, 2) != 36 and tonumber(char, 2) != 0 do -- 36 -> "$"
             table.insert(str,char)
             adres = adres + 1
-            char = ent.BANK:ReadS(adres,1)
+            char = entity.BANK:ReadS(adres, 1) 
         end
-        gTerminal:Broadcast(ent,RestoreString(str), GT_COL_MSG,x,y)
+
+        gTASM:FillBroadcast(entity,RestoreString(str), GT_COL_MSG,y,x)
     end,
 
-    function(ent,arg)
-        if !ent then
+    function(entity,arg)
+        if !entity then
             return {0,1}
         end
         local min,max = tonumber(arg[1],2),tonumber(arg[2],2)
@@ -176,16 +157,132 @@ gTASM.InterList = {
             max = 255
         end
         local num = math.random(min,max)
-        print(min,max,num)
-        ent.BANK:WriteS(ent.BANK:GetBoardBlock("SERVICE"),to8int(num))
+
+        entity.BANK:WriteS(entity.BANK:GetBoardBlock("SERVICE"),to8int(num))
     end,
+
+    function(entity,arg)
+        if !entity then
+            return {0,1}
+        end
+
+        local b = entity.BANK:GetBlock(tonumber(arg[1],2))
+
+        if b == false then
+            gTerminal:Broadcast(entity,"--MEMORY DUMP--",GT_COL_SUCC)
+            gTerminal:Broadcast(entity,"UNABLE TO CREATE MEMORY DUMP")
+            return
+        end
+
+        local dig = b.block.data[tonumber(arg[2],2)]
+        if dig == nil then
+            gTerminal:Broadcast(entity,"--MEMORY DUMP--",GT_COL_SUCC)
+            gTerminal:Broadcast(entity,"UNABLE TO CREATE MEMORY DUMP")
+            return
+        end
+
+        local block_tbl = strMemBlock(tobase(dig,2,64),40)
+        gTerminal:Broadcast(entity,"--MEMORY DUMP--",GT_COL_SUCC)
+        for k,v in pairs(block_tbl) do
+            gTerminal:Broadcast(entity, table.concat(v),GT_COL_SUCC)
+        end
+
+    end,
+
+    function(entity,arg)
+        if !entity then
+            return {0,1}
+        end
+
+        local b = entity.BANK:GetBlock(tonumber(arg[1],2))
+        if b == false then
+            gTerminal:Broadcast(entity,"--MEMORY DUMP--",GT_COL_SUCC)
+            gTerminal:Broadcast(entity,"UNABLE TO CREATE MEMORY DUMP")
+            return
+        end
+
+        local digits = b.block.data
+        local part   = tonumber(arg[2],2)
+
+        local max_parts = math.ceil(b.block.dcount / 12)
+
+        if part < 1 or (max_parts < part) or digits == nil then
+            gTerminal:Broadcast(entity,"--MEMORY DUMP--",GT_COL_SUCC)
+            gTerminal:Broadcast(entity,"UNABLE TO CREATE MEMORY DUMP")
+            return
+        end
+
+        local i_start = ((part - 1) * 12)+1
+        local i_end
+        if b.block.dcount <= 12 then
+            i_end   = b.block.dcount
+        else
+            local m = 0
+            
+            if (part * 12) > b.block.dcount then
+                m = (part * 12) - b.block.dcount
+            end
+
+            i_end   = (part * 12) - m
+        end
+        
+        local allstring = {}
+        local formtString = {}
+
+        for k=i_start,i_end do
+            local block_tbl = strMemBlock(tobase(digits[k],2,64),40)
+
+            for kk,vv in pairs(block_tbl) do
+                if formtString[kk] == nil then 
+                    formtString[kk] = table.concat(vv)
+                else
+                    formtString[kk] = formtString[kk] .. " " .. table.concat(vv)
+                end
+            end
+            
+            if k % 3 == 0 then
+                table.insert(allstring,formtString)
+                formtString = {}
+            end
+        end
+
+        if #formtString > 0 then
+            table.insert(allstring,formtString)
+            formtString = {}
+        end
+        
+        gTerminal:Broadcast(entity, "MEMORY DUMP PREPARING", GT_COL_SUCC)
+        gTerminal:Broadcast(entity, "ID = ".. b.id, GT_COL_SUCC)
+        gTerminal:Broadcast(entity, "BLOCKS = ".. b.block.dcount,GT_COL_SUCC)
+        gTerminal:Broadcast(entity, "PART = "..part.."/"..max_parts,GT_COL_SUCC)
+        timer.Simple(1, function()
+            --[[
+            for i = 0, 25 do
+                gTerminal:Broadcast(entity, "", MSG_COL_NIL, i);
+            end
+            --]]
+
+            for k,v in pairs(allstring) do
+                for kk,vv in pairs(v) do
+                    gTerminal:Broadcast(entity,vv,GT_COL_SUCC)
+
+                end
+                gTerminal:Broadcast(entity,"",GT_COL_SUCC)
+            end
+
+        end)
+--[[
+        gTASM:FillBroadcast(entity, "MEMORY DUMP", GT_COL_SUCC, 19, 34)
+        gTASM:FillBroadcast(entity, "ID = ".. b.id, GT_COL_SUCC, 21, 32)
+        gTASM:FillBroadcast(entity, "BLOCKS = ".. b.block.dcount,GT_COL_SUCC,22,32)
+        gTASM:FillBroadcast(entity, "PART = "..part.."/"..max_parts,GT_COL_SUCC,23,32)
+--]]
+    end
 }
 
 function gTASM:SysInterrupt(entity,id)
     local serv = entity.BANK:GetBoardBlock("SERVICE")
-
     local mem = self.InterList[id]()
-
     if mem == 0 then
         self.InterList[id](entity)
     else

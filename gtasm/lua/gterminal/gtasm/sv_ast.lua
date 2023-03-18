@@ -20,6 +20,7 @@ local function NumType(type,data)
 	end
 end
 
+
 digitsToNum = function(digits, base)
     local num, k = 0, 1
     for i = #digits, 1, -1 do
@@ -65,385 +66,160 @@ function ConvertNum(data,type)
     return fdata
 end
 
-function PT(arr,recurs)
-    if recurs == nil then
-        recurs = 0
-    end
-    local recursStr = ""
-    for i=0,recurs do
-        recursStr = recursStr .. "    "
-    end
 
-    for k,v in pairs(arr) do
-        if type(v) == "table" then
-            --print(recursStr..k,"=", type(v))
-            PT(v,recurs + 1)
-        else 
-            --print(recursStr..k,"=",v)
-        end
-    end
-end
-
-
-local function isOperand(oper)
-    return true
-end
-
-function astp(lex)
+function newast(lex)
+    local pos = 0
+    local tocken = {}
+    local string_t = false 
+    local addres_t = false
+    local oper = false
+    local label = false
     local ast = {}
-    local iter = 1
-    local argmas = {}
-    local arg_1  = {}
-    
-    for k,v in pairs(lex[1]) do
-        if (v.type == "whitespace" or v.type ==  "unidentified")  and ast.oper == nil then
-        else
-            
-            if #lex[1] == 1 then
-                ast.oper = v.data
-            end
+    local comma = 1
+    local cl_lex = {}
+    local addres_a = {}
+    ast.arg = {}
+    ast.arg[comma] = {}
 
-            if lex[1][1]["data"] == "." then
-                table.remove(lex[1],1)
-                ast.directive = true
-            end
-            --[[
-            if v.type == "label_end" and ast.label then
-                --return
-            elseif v.type == "label_end" and (ast.label == nil) then
-                -- return error
-            end
+    local function get_tocken(s)
+        local t = lex[pos + (s or 0)]
 
-            if v.type == "label_start" then
-                if lex[1][k+1].type == "label" then
-                    ast.label = lex[1][k+1].data
-                end
-                PrintTable(ast)
-            end
-            --]]
-            
-            if v.type == "ident" and ast.oper == nil then
-                if lex[1][k + 1]['data'] == ":" then -- проверка на метку
-                    ast.label = v.data
-                    print(v.data,"label")
+        return t or {type = "end_line",data=""}
+    end
+
+    local function nextop()
+        pos = pos + 1
+        return get_tocken()
+    end
+
+    local function ast_insert(op)
+        if op == false then
+            return
+        end
+
+        op.posFirst = nil
+        op.posLast  = nil
+
+        if op.type != nil then
+            op.n_type = NumType(op.type)
+            if op.n_type < GTASM_ALLNUM then
+                if op.n_type == GTASM_DNUM then
+                    op.data = tonumber(op.data)
                 else
-                    ast.oper = v.data
-                end
-            elseif not(v.type == "ident") and ast.oper == nil then --не идент значет ощибка!!!1
-
-            end
-
-            if ast.oper and not (v.data == ast.oper) then
-                if v.data == "," then
-                    table.insert(arg_1,argmas)
-                    argmas = {}
-                elseif not(v.type == "whitespace") then
-                    table.insert(argmas,v)
+                    op.convert = ConvertNum(op.data, op.type)
                 end
             end
         end
-        PrintTable(ast)
+
+        if addres_t == true then
+            table.insert(addres_a.data, op)
+        else
+            table.insert(ast.arg[comma], op)
+        end
     end
 
-    if #argmas > 0 then
-        table.insert(arg_1,argmas)
-        argmas = {}
+    local function set_addres(bool)
+        addres_t = bool
+        if bool then
+            addres_a = {
+                type = "addres",
+                data = {}
+            }
+        else
+            ast_insert(addres_a)
+            addres_a = {}
+        end
     end
 
-    local skobk = {bstart = 0,bstop = 0,b = {},hstart = 0,hend = 0}
-    local strg  = {bstart = 0,bstop = 0,b = {},hstart = 0,hend = 0}
-    local stag  = false
-    local sttag = false
-    for k,v in pairs(arg_1) do
-        --if #v > 1 then
-            --if !((v[1]['data'] == "["  and  v[3]['data'] == "]") or (v[1]['data'] == "'"  and  v[3]['data'] == "'") or (v[1]['data'] == '"'  and  v[3]['data'] == '"')) then -- bruh
-                --error(4)
-            --end
-        --end
-        for kk,vv in pairs(v) do
-            if vv.type == "hex_val" or vv.type == "bin_val" then
-                arg_1[k][kk]["convert"] = ConvertNum(vv.data,vv.type)
+    local function push_mem_type(size)
+        debug.Trace()
+        if addres_t == true then
+            addres_a.data[#addres_a.data]["byte_size"] = size
+        else
+            ast.arg[comma][#ast.arg[comma]]["byte_size"] = size
+        end
+    end
+
+    for k,v in pairs(lex) do -- clear all whitespaces
+        if v.type != "whitespace" then
+            table.insert(cl_lex, v)
+        end
+    end
+    lex = cl_lex
+
+    if #lex == 0 then
+        return
+    end
+
+    while true do
+        local op = nextop()
+
+        if op.type == "end_line" then
+            break
+        end
+        PrintTable(op)
+        if op.type == "ident" then
+            if label == false and oper == false and get_tocken(1).data == ":" then
+                ast.label = op.data
+                label = true
+                nextop()
+                continue
+
+            elseif oper == false then
+                ast.oper = op.data
+                oper = true
+                continue
+
+            elseif GT_M_SIZE[op.data] then
+
+                push_mem_type(GT_M_SIZE[op.data])
+                continue
+            else
+                ast_insert(op)
+                continue
             end
 
-            if vv.data == "[" then
-                if stag then
-                    return false, 1, {POS_1 = skobk.hstart,POS_2 = vv.posFirst}
-                end
+        elseif op.type == "symbol" then
+            if op.data == "[" then
+                set_addres(true)
 
-                stag = true
-                skobk.bstart = kk
-                skobk.hstart = vv.posFirst
-            elseif vv.data == "]" then
-                if !stag then
-                    return false, 1, {POS_1 = vv.posFirst}
-                end
+            elseif op.data == "]" then
+                set_addres(false)
+            end
 
-                stag = false
-                skobk.bstop = kk
-                skobk.type  = "addres"
-                table.remove(skobk.b, 1)
-
-                for i=skobk.bstart,skobk.bstop do
-                    table.remove(arg_1[k], skobk.bstart)
-                end
+            continue
+        elseif op.type == "unidentified" then
+            if op.data == "," then
+                comma = comma + 1
+                ast.arg[comma] = {}
+                continue
                 
-                table.insert(arg_1[k], skobk.bstart, skobk)
-                skobk = {bstart = 0, bstop = 0, b = {}}
             end
 
-            if vv.type == "string_start" then
-                if sstag then
-                    return false, 2, {POS_1 = strg.hstart, POS_2 = vv.posFirst}
-                end
-
-                sstag = true
-                strg.bstart = kk
-                strg.hstart = vv.posFirst
-            elseif vv.type == "string_end" then
-                sstag = false
-                strg.bstop = kk
-                strg.type  = "string"
-                table.remove(strg.b, 1)
-
-                for i=strg.bstart, strg.bstop do
-                    table.remove(arg_1[k], strg.bstart)
-                end
+        elseif op.type == "string_start" then
+            if get_tocken(2).type == "string_end" then
+                op = nextop()
+                ast_insert(op)
+                nextop()
                 
-                table.insert(arg_1[k], strg.bstart, strg)
-                strg  = {bstart = 0, bstop = 0, b = {}}
+                continue
+            else
+                -- error
             end
 
-            if stag then
-                table.insert(skobk.b, vv)
-            end
-            
-            if sstag then
-                table.insert(strg.b, vv)
-            end
+        elseif op.type == "number" or op.type == "bin_val" or op.type == "hex_val" then
+            ast_insert(op)
+            continue
+        end
+
+        if pos == #lex then
+            break
         end
     end
 
-    if stag then
-        return false, 1, {POS_1 = skobk.hstart}
+    for k,v in pairs(ast.arg) do
+        ast.arg[k] = v[1]
     end
 
-    if sstag then
-        return false, 2, {POS_1 = strg.hstart}
-    end
-
-    local fin_arg = {}
-    for k,v in pairs(arg_1) do
-        for kk,vv in pairs(v) do
-            if vv.type == "addres" or vv.type == "string" then
-                for kkk,vvv in pairs(vv.b) do
-                    vv.b[kkk]["n_type"] = NumType(vv.b[kkk]["type"])
-                end
-                vv.data = vv.b
-            end
-            table.insert(fin_arg,{
-                type = vv.type,
-                n_type = NumType(vv.type),
-                data = vv.data,
-                convert = vv.convert
-            })
-        end
-    end
-    ast.arg = fin_arg
-
-    PT(ast)
     return ast
 end
---[[
-function testast(lexx)
-    local lex = lexx[1]
-    local pos = 1
-    local ast = {}
-
-    local function getV(d)
-        return lex[pos + d or 0]
-    end
-
-    local function removeSpaceAndTrash()
-        local lpos = 1
-        while true do
-            if getV().type == "whitespace" or getV().type == "string_start" or getV().type == "string_end" or getV().type == "label_start" or getV().type == "label_end" then -- bruh
-                table.remove(lex[pos])
-            else
-                lpos = lpos + 1
-            end
-            if lpos > #lex then
-
-            end
-        end
-    end
-
-    local function astInsert()
-        
-    end--[[
-::Label:: db 0b10101, 0xdeadbeef, "skibidi", [R1]
-lex ->  [:: - label_start]
-        [Label -    label]
-        [:: -   label_end]
-        [whitespace]
-        [db - ident]
-        [whitespace]
-        [0b10101 - bin_val]
-        [, - symbol]
-        [whitespace]
-        [0xdeadbeef - hex_val]
-        [, - symbol]
-        [" - string_start]
-        [skibidi - string]
-        [" - string end]
-        [, - symbol]
-        [whitespace]
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-
-
-
-NEED
-    {
-        label = "Label"
-        commmand = "db"
-        args = {
-            1 = {0b10101, bin_val}
-            2 = {deadbeef, hex_val}
-            3 = {skibidi, string}
-            4 = {R1, addres}
-        }
-    }
-1 этап убираем все пробелы
-lex ->  [:: - label_start]
-        [Label -    label]
-        [:: -   label_end]
-        [db - ident]
-        [0b10101 - bin_val]
-        [, - symbol]
-        [0xdeadbeef - hex_val]
-        [, - symbol]
-        [" - string_start]
-        [skibidi - string]
-        [" - string end]
-        [, - symbol]
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-
-
-2 этап делим на запятые
-{
-        [:: - label_start]
-        [Label -    label]
-        [:: -   label_end]
-        [db - ident]
-        [0b10101 - bin_val]
-}
-{
-        [0xdeadbeef - hex_val]
-}
-{
-        [" - string_start]
-        [skibidi - string]
-        [" - string end]
-}
-{
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-}
-
-3 этап определяем метку
-label = "Label"
-{
-        [db - ident]
-        [0b10101 - bin_val]
-}
-{
-        [0xdeadbeef - hex_val]
-}
-{
-        [" - string_start]
-        [skibidi - string]
-        [" - string end]
-}
-{
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-}
-
-4 этап определяем команду( берём первый идент)
-label = "Label"
-cmd   = "db"
-{
-        [0b10101 - bin_val]
-}
-{
-        [0xdeadbeef - hex_val]
-}
-{
-        [" - string_start]
-        [skibidi - string]
-        [" - string end]
-}
-{
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-}
-
-5 этап определяем строки
-{
-        [0b10101 - bin_val]
-}
-{
-        [0xdeadbeef - hex_val]
-}
-{
-        [skibidi - string]
-}
-{
-        [[ - simbol]
-        [R1 - ident]
-        [] - simbol]
-}
-
-6 этап определяем адррес
-{
-        [0b10101 - bin_val]
-}
-{
-        [0xdeadbeef - hex_val]
-}
-{
-        [skibidi - string]
-}
-{
-        [R1 - ident,address]
-}
-
-7 этап вносим в массив ast
-    {
-        label = "Label"
-        commmand = "db"
-        args = {
-            1 = {data = "0b10101",convert = 21,type = GTASM_BVAL}
-            2 = {data = "0xdeadbeef",convert = 3 735 928 559, type = GTASM_HVAL}
-            3 = {data = "skibidi', type = GTASM_STR}
-            4 = {addres,data = {R1=}
-        }
-    }
---]]
---[[
-    while true do
-        break
-    end
-end
---]]
-local text = "::Label:: db 'asdss' ,0b0101"
-local loex = lexer(text)
-a = astp(loex)
-print("")
-PrintTable(a)

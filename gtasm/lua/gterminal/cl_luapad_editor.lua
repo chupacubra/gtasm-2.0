@@ -40,7 +40,7 @@ luapad = {}
 	
 	self.TextEntry = vgui.Create("TextEntry", self);
 	self.TextEntry:SetMultiline(true);
-	self.TextEntry:SetAllowNonAsciiCharacters(true)
+	self.TextEntry:SetAllowNonAsciiCharacters(false)
 	self.TextEntry:SetSize(0, 0);
 	
 	self.TextEntry.OnLoseFocus = function (self) self.Parent:_OnLoseFocus(); end

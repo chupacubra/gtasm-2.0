@@ -3,9 +3,9 @@ AddCSLuaFile();
 ENT.Type = "anim";
 ENT.Base = "base_anim";
 
-ENT.PrintName = "Computer(CORD)";
-ENT.Author = "Chessnut";
-ENT.Purpose = "Used to compute stuff.";
+ENT.PrintName = "Computer(GTASM)";
+ENT.Author = "Chupas";
+ENT.Purpose = "Some changes of base.";
 
 ENT.Spawnable = true;
 ENT.Category = "gTerminal";

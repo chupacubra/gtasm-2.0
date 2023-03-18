@@ -6,32 +6,32 @@ local function haveComment(arr)
 	end
 	return false
   end
-  
+
 function gTASM:SetUpMemory(entity)
 	entity.BANK = BankMem:Create({
 		{"REGISTR",320}, 
-		{"STACK",320},   
-		{"POOL1",320},   
-		{"POOL2",320},  
-		{"SERVICE",320},
-		{"GLOBAL",320},
-	})
+		{"STACK",1280},
+		{"SERVICE",640},
+		{"POOL1",1280},
+		{"POOL2",1280},
+	},entity:EntIndex())
+
 	entity.memLabel = {}
 	entity.jumpLabel = {}
 	entity.endscr = false
 	entity.regLabel = {
 		R1 = 0,R2 = 2,R3 = 4,
 		R4 = 6,R5 = 8,R6 = 10,
-		R7 = 12,R8 = 14,
-
+		R7 = 12,R8 = 14,R9 = 16,
+		SP = 29,
 		IP = 31,
-		SP = 32,
 		CF = 33,
 		ZF = 34,
 		CR = 35,
 		INP = 36,
 		INK = 37,
 		INS = 38,
+		INT_1 = 200, INT_2 = 201,INT_3 = 202,INT_4 = 203, INT_5 = 204,
 	}
 
 	entity.FLAGS = {
@@ -63,7 +63,7 @@ function gTASM:PreparTheScript(code)
 
 	for k,v in pairs(code) do
 		if string.find(v,"#") then
-			local tbc = string.toTable(v)
+			local tbc = string.ToTable(v)
 			local posp = {}
 			local srt
 			local find = false
@@ -82,13 +82,19 @@ function gTASM:PreparTheScript(code)
 			else
 				str = string.gsub(table.concat(tbc),"%%%#","#")
 			end
-			code[k] = string.Trim(str)
+			local s = string.Trim(str)
+
+			if s == "" then
+				table.remove(code,k)
+			else
+				code[k] = s
+			end
 		end
 	end
 
     local function AddStrArr(arr,nextstr,i)
         if string.EndsWith( nextstr, ">;" ) then
-            nextt =  string.reverse(string.gsub(string.reverse(v), ";>", "", 1))
+            nextt =  string.reverse(string.gsub(string.reverse(nextstr), ";>", "", 1))
             table.insert(arr,nextt)
             return AddStrArr(arr,code[i+1],i+1)
         else
@@ -112,6 +118,5 @@ function gTASM:PreparTheScript(code)
 			v = str
 		end
 	end
-
     return code 
 end
