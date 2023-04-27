@@ -43,14 +43,14 @@ function gTASM:SetRegister(entity,name,val,size)
 	entity.BANK:WriteS(address,tobinval(val,size or 1))
 end
 
-function gTASM:GetRegister(entity, name)
+function gTASM:GetRegister(entity, name, size)
 	local address = entity.regLabel[name]
 
 	if address == nil then
 		return
 	end
 
-	local val = entity.BANK:ReadS(address)
+	local val = entity.BANK:ReadS(address, size or 1)
 	return val
 end
 
@@ -60,26 +60,21 @@ function gTASM:StackPush(entity, val, size)
 		IS BROKEN
 	]]
 	local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
-	local stack_stat = tonumber(gTASM:GetRegister(entity,"SP"),2)
-	print("PUSH",val,size)
-	
+	local stack_stat = tonumber(gTASM:GetRegister(entity,"SP", 2),2)
+
 	if serv_start + stack_stat > serv_end then
 		gTASM:ErrorScript(entity, GT_E_STACK_OVER,{LAST_PUSH = val})
 		return
 	end
 
 	entity.BANK:WriteS(serv_start + stack_stat, tobinval(val, size or 1))
-	print(stack_stat + (size or 1))
 	
 	gTASM:SetRegister(entity, "SP", stack_stat + (size or 1), 2)
 end
 
 function gTASM:StackPop(entity, size)
 	local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
-	print(entity.BANK:ReadS(entity.regLabel.SP, 1))
-	
-    local stack_stat = tonumber(entity.BANK:ReadS(entity.regLabel.SP, 1),2)
-	print(entity.regLabel.SP,stack_stat)
+    local stack_stat = tonumber(gTASM:GetRegister(entity,"SP", 2),2)
     
 	if stack_stat != 0 then
         stack_stat = stack_stat - (size or 1)
@@ -89,24 +84,19 @@ function gTASM:StackPop(entity, size)
 		end
     end
 	
-	print("POP",serv_start,stack_stat)
     
 	local var = tonumber(entity.BANK:ReadS(serv_start + stack_stat, size or 1),2)
 	gTASM:SetRegister(entity, "SP", stack_stat, 2)
-    entity.BANK:WriteS(serv_start + stack_stat,tobinval(0,size or 1))
+    entity.BANK:WriteS(serv_start + stack_stat, tobinval(0,size or 1))
 	
-	--if var == nil then
-	--	entity.endscr = true
-	--end
-
 	return var
 end
 
 
 function gTASM:OpenDerm(entity,client,content,name)
 	if ( !IsValid(entity) ) then
-		return;
-	end;
+		return
+	end
 	net.Start("gT_RedDerm")
 	net.WriteEntity(entity)
 	net.WriteString(content)
