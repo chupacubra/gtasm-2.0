@@ -62,6 +62,7 @@ function gTASM:StackPush(entity, val, size)
 	local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
 	local stack_stat = tonumber(gTASM:GetRegister(entity,"SP"),2)
 	print("PUSH",val,size)
+	
 	if serv_start + stack_stat > serv_end then
 		gTASM:ErrorScript(entity, GT_E_STACK_OVER,{LAST_PUSH = val})
 		return
@@ -69,25 +70,34 @@ function gTASM:StackPush(entity, val, size)
 
 	entity.BANK:WriteS(serv_start + stack_stat, tobinval(val, size or 1))
 	print(stack_stat + (size or 1))
+	
 	gTASM:SetRegister(entity, "SP", stack_stat + (size or 1), 2)
 end
 
 function gTASM:StackPop(entity, size)
 	local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
-	print(entity.BANK:ReadS(entity.regLabel.SP, size or 1))
-    local stack_stat = tonumber(entity.BANK:ReadS(entity.regLabel.SP, size or 1),2)
+	print(entity.BANK:ReadS(entity.regLabel.SP, 1))
+	
+    local stack_stat = tonumber(entity.BANK:ReadS(entity.regLabel.SP, 1),2)
 	print(entity.regLabel.SP,stack_stat)
-    if stack_stat != 0 then
+    
+	if stack_stat != 0 then
         stack_stat = stack_stat - (size or 1)
+		if stack_stat < 0 then
+			gTASM:ErrorScript(entity, GT_E_STACK_OVER,{LAST_POP_SIZE = size})
+			return
+		end
     end
+	
 	print("POP",serv_start,stack_stat)
-    local var = tonumber(entity.BANK:ReadS(serv_start + stack_stat, size or 1),2)
+    
+	local var = tonumber(entity.BANK:ReadS(serv_start + stack_stat, size or 1),2)
 	gTASM:SetRegister(entity, "SP", stack_stat, 2)
     entity.BANK:WriteS(serv_start + stack_stat,tobinval(0,size or 1))
 	
-	if var == nil then
-		entity.endscr = true
-	end
+	--if var == nil then
+	--	entity.endscr = true
+	--end
 
 	return var
 end
