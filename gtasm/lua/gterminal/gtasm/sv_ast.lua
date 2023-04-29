@@ -132,7 +132,7 @@ function newast(lex)
     end
 
     local function push_mem_type(size)
-        debug.Trace()
+        --debug.Trace()
         if addres_t == true then
             addres_a.data[#addres_a.data]["byte_size"] = size
         else
@@ -157,7 +157,7 @@ function newast(lex)
         if op.type == "end_line" then
             break
         end
-        PrintTable(op)
+
         if op.type == "ident" then
             if label == false and oper == false and get_tocken(1).data == ":" then
                 ast.label = op.data

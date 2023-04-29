@@ -20,6 +20,8 @@ GT_E_MEM_VAL     = 8
 GT_E_MEM_ADDRES  = 9
 GT_E_PIRATE      = 10
 GT_E_STOP        = 11
+GT_E_COMPILE     = 12
+GT_E_INT_UNK     = 13
 
 GT_BYTE  = 1
 GT_WORD  = 2
@@ -42,5 +44,7 @@ GTASM_ERROR_LIST = {
 	"MEMBLOCK error: it's not a value",
 	"MEMBLOCK error: unknown addres",
 	"YOU'RE USING PIRATE VERSION OF gTASM. The corporation has found out your location. Calling the FBI squad...",
-	"Script stop (int 1)"
+	"Script stop (int 1)",
+	"Compiler: you broken lexical tree. YOU ENJOED?",
+	"Interrupt: interrupts under this id do not exist",
 }

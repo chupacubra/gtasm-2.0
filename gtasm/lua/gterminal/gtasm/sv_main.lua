@@ -15,7 +15,7 @@ util.AddNetworkString("gTSM_FillBroadcast")
 util.AddNetworkString("gTSM_ColorBroadcast")
 
 
-function gTASM:Logger(typeL, data)
+function gTASM:Logger(typeL, data) -- if script accidentaly freeze the game this can help you
 	if typeL == "start" then
 		local f = file.Open( "gtasmLog.txt", "w", "DATA" )
 		f:Write("START LOG "..data[1].."\n")
@@ -44,21 +44,18 @@ function gTASM:SetRegister(entity,name,val,size)
 end
 
 function gTASM:GetRegister(entity, name, size)
-	local address = entity.regLabel[name]
+	local adres= entity.regLabel[name]
 
-	if address == nil then
+	if adres == nil then
 		return
 	end
 
-	local val = entity.BANK:ReadS(address, size or 1)
+	local val = entity.BANK:ReadS(adres, size or 1)
+
 	return val
 end
 
 function gTASM:StackPush(entity, val, size)
-	--[[
-		THE STACK
-		IS BROKEN
-	]]
 	local serv_start,serv_end = entity.BANK:GetBoardBlock("STACK")
 	local stack_stat = tonumber(gTASM:GetRegister(entity,"SP", 2),2)
 
@@ -68,7 +65,6 @@ function gTASM:StackPush(entity, val, size)
 	end
 
 	entity.BANK:WriteS(serv_start + stack_stat, tobinval(val, size or 1))
-	
 	gTASM:SetRegister(entity, "SP", stack_stat + (size or 1), 2)
 end
 
@@ -82,7 +78,9 @@ function gTASM:StackPop(entity, size)
 			gTASM:ErrorScript(entity, GT_E_STACK_OVER,{LAST_POP_SIZE = size})
 			return
 		end
-    end
+    else
+		gTASM:ErrorScript(entity, GT_E_STACK_OVER,{LAST_POP_SIZE = size})
+	end
 	
     
 	local var = tonumber(entity.BANK:ReadS(serv_start + stack_stat, size or 1),2)
@@ -97,6 +95,7 @@ function gTASM:OpenDerm(entity,client,content,name)
 	if ( !IsValid(entity) ) then
 		return
 	end
+
 	net.Start("gT_RedDerm")
 	net.WriteEntity(entity)
 	net.WriteString(content)
@@ -182,23 +181,23 @@ function gTASM:InsertDBInMemory(entity,val,name)
 end
 
 function gTerminal:ExecuteCode(entity,code,client)
-	if entity == nil then
+	if !IsValid(entity) then
 		return
 	end
 
 	gTASM:SetUpMemory(entity)
 	
 	entity.script = {}
+
 	local i = 1
 	local code = gTASM:PreparTheScript(code)
-	PrintTable(code)
+
 	for k,v in pairs(code) do
 		local lex = lexer(v)
 		local succes, ast, err, dat= pcall(newast,lex[1])
 
 		if !succes then
-			print("ERROR!: can't predcompile file!")
-			print(k,succes,ast)
+			gTASM:ErrorScript(entity, GT_E_COMPILE)
 			return
 		end
 		
@@ -216,15 +215,16 @@ function gTerminal:ExecuteCode(entity,code,client)
 		end
 		table.insert(entity.script,ast)
 	end
-	PrintTable(entity.script)
-
+	
 	entity.str_i = 1
 	local ent_id = entity:EntIndex()
+	
 	hook.Add( "Tick", "gT_"..ent_id, function()
-		if entity == Entity(-1) then
+		if !entity:IsValid() then
 			hook.Remove( "Tick", "gT_"..ent_id )
 			return
 		end
+
 		if #entity.script < entity.str_i then
 			entity.endscr = true
 			return
@@ -238,6 +238,7 @@ function gTerminal:ExecuteCode(entity,code,client)
 		local command = entity.script[entity.str_i]
 
 		local err, ed = gTASM:ExecuteCommand(entity, command)
+
 		if err != nil then
 			hook.Remove( "Tick", "gT_"..ent_id )
 			ed["LINE"] = entity.str_i
@@ -249,6 +250,7 @@ function gTerminal:ExecuteCode(entity,code,client)
 		if entity.str_i == nil then
 			entity.endscr = true
 		end
+
 		entity.str_i = entity.str_i  + 1
 	end)
 end
@@ -282,7 +284,6 @@ hook.Add("gTASM", "MemoryIndexE", function(id, err)
 	gTASM:ErrorScript(entity, GT_E_MEM_ADDRES, {INV_ADR = err[1], SIZE = err[2], LINE = entity.str_i})
 end)
 
-
 net.Receive("gT_SaveDerm", function(length, client)
 	local entity = net.ReadEntity()
 	local content = net.ReadString()
@@ -300,7 +301,6 @@ net.Receive("gT_SaveDerm", function(length, client)
 	--[[remove the \]]
 	
 	table.remove(file)
-	PrintTable(file)
 	local value = util.TableToJSON(file)
 	
 	value = string.gsub(value,"\r","")
@@ -334,7 +334,6 @@ net.Receive("gT_ActiveKeyType", function()
 end)
 
 function gTerminal:StartKeyType(ent,ply)
-	--print("SEND TO CLIENT")
 	net.Start("gT_StartKeyType")
 	net.WriteEntity(ent)
 	net.Send(ply)

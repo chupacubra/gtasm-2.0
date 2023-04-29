@@ -13,9 +13,7 @@ gTASM = gTASM or {}
     10- return random value   min,max if max == 0 then max = 255
     ...
     TODO
-    ???- get input
     ???- work with files
-    ???- 2 type of keyboard input(for games or text redactors)
     ???- BLOCK :tasm stop  (for secure or viruses!!121)
     ???- ...
 ]]--
@@ -75,6 +73,7 @@ gTASM.InterList = {
         if !entity then
             return {0,1}
         end
+        
         local adres = tonumber(arg[1]..arg[2],2)
 
         local str = {}
@@ -214,6 +213,7 @@ gTASM.InterList = {
 
         local i_start = ((part - 1) * 12)+1
         local i_end
+
         if b.block.dcount <= 12 then
             i_end   = b.block.dcount
         else
@@ -255,6 +255,7 @@ gTASM.InterList = {
         gTerminal:Broadcast(entity, "ID = ".. b.id, GT_COL_SUCC)
         gTerminal:Broadcast(entity, "BLOCKS = ".. b.block.dcount,GT_COL_SUCC)
         gTerminal:Broadcast(entity, "PART = "..part.."/"..max_parts,GT_COL_SUCC)
+
         timer.Simple(1, function()
             --[[
             for i = 0, 25 do
@@ -282,7 +283,14 @@ gTASM.InterList = {
 
 function gTASM:SysInterrupt(entity,id)
     local serv = entity.BANK:GetBoardBlock("SERVICE")
+
+    if !self.InterList[id] then
+        gTASM:ErrorScript(entity, GT_E_INT_UNK, {ID_INT = tostring(id)})
+        return
+    end
+
     local mem = self.InterList[id]()
+    
     if mem == 0 then
         self.InterList[id](entity)
     else

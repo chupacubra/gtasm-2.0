@@ -153,7 +153,7 @@ end
 
 gTASM:NewOper("mov","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-    {GTASM_ALL}
+    {GTASM_ALL},
 },function(entity,arg)
     local addr = arg[1]["mem_addres"]
     local value = arg[2]["convert"] or arg[2]["data"]
@@ -163,7 +163,8 @@ end)
 
 gTASM:NewOper("add","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-    {GTASM_ALL}
+    {GTASM_ALL},
+    no_string = true
 },function(entity,arg)
     local addr = arg[1]["mem_addres"]
     local val1 = arg[1]["convert"] or arg[1]["data"]
@@ -182,7 +183,8 @@ end)
 
 gTASM:NewOper("sub","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-    {GTASM_ALL}
+    {GTASM_ALL},
+    no_string = true
 },function(entity,arg)
     local addr = arg[1]["mem_addres"]
     local val1 = arg[1]["convert"] or arg[1]["data"]
@@ -201,7 +203,8 @@ end)
 
 gTASM:NewOper("sbb","Memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
-    {GTASM_ALL}
+    {GTASM_ALL},
+    no_string = true
 },function(entity,arg)
     local addr = arg[1]["mem_addres"]
     local val1 = arg[1]["convert"] or arg[1]["data"]
@@ -331,7 +334,6 @@ gTASM:NewOper("cmp","Logic",{
     local var1 = arg[1]["data"]
     local var2 = arg[2]["convert"] or arg[2]["data"]
 
-
     var1 = var1 - var2
     
     local zf,cf
@@ -345,6 +347,7 @@ gTASM:NewOper("cmp","Logic",{
         zf = 0
         cf = 0
     end
+
     gTASM:SetRegister(entity,"CF",cf)
     gTASM:SetRegister(entity,"ZF",zf)
 end)
@@ -453,7 +456,6 @@ gTASM:NewOper("int","Interrupt",{
     gTASM:SysInterrupt(entity,id)
 end)
 
-
 gTASM:NewOper("push","memory",{
     {GTASM_ALL},
 },function(entity,arg)
@@ -465,7 +467,7 @@ end)
 gTASM:NewOper("pop","memory",{
     {GTASM_VAR, GTASM_REG, GTASM_ADDR},
 },function(entity,arg)
-    local addr = arg[1]["mem_addres"]
+    local toaddr = arg[1]["mem_addres"]
     local var = gTASM:StackPop(entity, arg[1]["byte_size"])
 
     entity.BANK:WriteS(toaddr, tobinval(var,arg[1]["byte_size"]))
@@ -484,8 +486,7 @@ end)
 gTASM:NewOper("ret","Procces",{
     {GTASM_ALLNUM},
 },function(entity,arg)
-    --local label = arg[1]["data"]  arg[1]["convert"] or arg[1]["data"]
     local i = gTASM:StackPop(entity,2)
-    print("FROM stack",i)
+
     entity.str_i = i
 end)

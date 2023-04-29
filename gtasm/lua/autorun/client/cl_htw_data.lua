@@ -59,7 +59,7 @@ Using gTASM, we can turn a computer into:
 
 <h3>Preparing the system</h3>
 <p>In conventional systems such as Personal and Server, we will not be able to program. We need a <b>ptsm</b> OS system. Just enter it into a new computer:</p>
-<pre>
+<pre style='border:1px solid'>
 :os install ptsm 
 </pre>
 <p>The new system is endowed with new utilities such as a code editor(:f dr) and a disk(:d). their use is well described in the description of the commands.</p>
@@ -75,18 +75,18 @@ page_list["syntaxis.txt"] = [[
 <body>
 <h2>Syntaxis</h2>
 <p>The syntax of the commands here is quite simple. I'll show you by example:</p>
-<pre>OPER VAR, VAR2, VAR3, ...</pre>
+<pre style='border:1px solid'>OPER VAR, VAR2, VAR3, ...</pre>
 <p>This example shows that the main command comes first, then the arguments come. Here is a real example:</p>
-<pre>mov R1, 3</pre>
+<pre style='border:1px solid'>mov R1, 3</pre>
 <p>This command transfers the value 5 to the R1 register.</p>
 <h4>Labels</h4>
 <p>Labels are defined by the name with colons at the end</p>
-<pre>
+<pre style='border:1px solid'>
 ...
 myGoodLabel:
 ...</pre>
 <p>Also, the label ONLY needs the db command to give it a name:</p>
-<pre>
+<pre style='border:1px solid'>
 someString: db 'Some string',0  #with label
 db 'ABC',0 #without label
 </pre>
@@ -97,24 +97,24 @@ db 'ABC',0 #without label
 <dt><b>Numbers</b> can be written in decimal, binary, and hexadecimal: <code>123, 0b0101, 0xA0</code>
 <dl>
 EX:
-<pre>
+<pre style='border:1px solid'>
 Text: db 'Hello World!'
 mov R3, 0x5A
 add R1, 0b10
 </pre>
 <p><b>Addresses</b> are a special kind of values. They are a direct reference to a memory cell. here is an example of writing:</p>
-<pre>
+<pre style='border:1px solid'>
 mov [40], 42     # [ var ]  is addres
 mov [R2], 0x3
 mov R4, [DBNAME]
 </pre>
 <h3>Comments</h3>
-<pre>
+<pre style='border:1px solid'>
 mov R1,10   # COMMENT
 </pre>
 <h3>Line break</h3>
 <p>A line break <b>;></b> is needed to point to the next line. Convenient for db command</p>
-<pre>
+<pre style='border:1px solid'>
 ASCII: db >;
 ' _  __ ________', ;>
 '|_|(_ /   |  |', ;>
@@ -267,7 +267,7 @@ page_list["memory.txt"] = [[
 
 
 <p>To address directly to the memory address, оust write the value inside the square brackets:</p>
-<pre>
+<pre style='border:1px solid'>
 mov [14], 7
 mov [R1], 230    # read value from R1
 mov R2, [SOMEDB] # get start addres of SOMEDB
@@ -275,7 +275,7 @@ mov R2, [SOMEDB] # get start addres of SOMEDB
 
 <h3>MOV and DB</h3>
 <p>The easiest way to work with memory is the <code>MOV</code> command.It copies the value from one memory location to another. A number can also be an argument.</p>
-<pre>
+<pre style='border:1px solid'>
 mov ARG1, ARG2
 
 mov R1, 0x43
@@ -284,7 +284,7 @@ mov R1, R2
 
 </pre>
 <p>To write a large amount of data to memory, the db command is used. With its help, we can write not only numbers, but also strings. Еhe value recording starts in the <b>POOL1</b> block.</p>
-<pre>
+<pre style='border:1px solid'>
 db 'Amogus!', 0
 </pre>
 <p>In memory</p>
@@ -318,7 +318,7 @@ db 'Amogus!', 0
 </table>
 
 <p>To get a special pointer, write a label at the beginning of this entry. This label will not work with <code>JMP</code>!</p>
-<pre>
+<pre style='border:1px solid'>
 myText: db 'I like eat'
 </pre>
 
@@ -326,7 +326,7 @@ myText: db 'I like eat'
 <p>If you need to store and use a number that is greater than 255, then there are several ways:</p>
 <b>Using the Size pointer</b>
 <p>To write a large number, we simply use a size pointer</p>
-<pre>
+<pre style='border:1px solid'>
 bignumber: db 1035 word
 verybig: db 
 mov R1, bignumber <b>word</b> # word - 2 bytes
@@ -336,7 +336,7 @@ mov verybig, 555 word
 <p>Since the addresses of the pool1 block already go beyond 8 bits, working with addresses from DB is possible only with the 'word' pointer</p>
 
 Suddenly! Program 'Hello world'!
-<pre>
+<pre style='border:1px solid'>
 Hello: db 'Hello wordl!','$'
 mov INT_1, [Hello] word #INT_1 is predefined register in addres 200
 int 6
@@ -352,13 +352,13 @@ page_list["math_oper.txt"] = [[
 <body>
 <h2>Math in gTASM</h2>
 <p>The math in gTASM is not that complicated. There are basic addition <code>ADD</code> and subtraction <code>SUB</code> operations in this language.</p>
-<pre>
+<pre style='border:1px solid'>
 mov R1,32 
 add R1,90 # 32 + 90 = 122
 sub R1,32 # 122 - 32 = 90
 </pre>
 <p>But do not forget that our numbers are in 8-bit cells - other commands are used to work with numbers that are greater than 255.When we try to fit a number in memory that is greater than 255, the following happens:</p>
-<pre>
+<pre style='border:1px solid'>
     mov R1, 258
              |
              V
@@ -371,7 +371,7 @@ sub R1,32 # 122 - 32 = 90
  trash bucket
 </pre>
 <p>This rule is only for the mov command. For mathematical commands, the rules for working with numbers are different:</p>
-<pre>
+<pre style='border:1px solid'>
     add R1, 258
              |
              V
@@ -385,7 +385,7 @@ sub R1,32 # 122 - 32 = 90
 </pre>
 <p>That is, the marked digit now goes to CF - Carry Flag. Therefore, if we want to add up large numbers, we need several memory cells.
 For example, we can use cells [1],[2] to store a 2 byte number. Let [1] be the highest byte, and [2] the lower.</p>
-<pre>
+<pre style='border:1px solid'>
     mov [1], 32
     mov [2], 123
          
@@ -400,7 +400,7 @@ MEMORY  0: 00000000  0        00100000 01111011 = 8315
 <p>For mathematical operations with such numbers, we need special commands like <code>ADC</code> and <code>SBB</code>. They are needed in order to perform operations with the highest bits.</p>
 <p>The ADC command adds a Carry Flag(CF) to the sum - <code>ARG1 + ARG2 + CF</code>. SBB does a similar action - <code>ARG1 - ARG2 - CF</code></p>
 
-<pre>
+<pre style='border:1px solid'>
 For example, we have the numbers 563 and 296 and we need to sum them up.
 The first number is in [3]:[4], the second [5]:[6]
       H        L
@@ -434,7 +434,7 @@ In total:
 </pre>
 
 <p>Another example. Let's sum up 200 and 100</p>
-<pre>
+<pre style='border:1px solid'>
 # [0]:[1] + [2]:[3]
 mov [1], 100 
 mov [3], 200
@@ -449,9 +449,9 @@ int 11       # Cool interupt! we can see dump of memory in screen
 </pre>
 
 <h3>Size pointers</h3>
-<p>If you start to have questions about the <a href='https://www.youtube.com/watch?v=DQZvseZWdfg'>type of this</a>, then do not despair. There is an easier way to add large numbers.</p>
+<p>If you start to have questions about the type of this ( https://www.youtube.com/watch?v=DQZvseZWdfg ), then do not despair. There is an easier way to add large numbers.</p>
 
-<pre>
+<pre style='border:1px solid'>
 mov R1, 200 word # The prefix immediately sets how the number should be stored in memory
 mov R2, 100 word
 
@@ -464,7 +464,7 @@ int 11
 
 <h3>Logics operation</h3>
 <p>In gTASM there are logical commands that are needed to perform logical operations. For example, take the AND command</p>
-<pre>
+<pre style='border:1px solid'>
 mov R1, 15
 mov R2, 6
 
@@ -476,7 +476,7 @@ and R1, R2
         0110 R1
 </pre>
 <p>There are several logical operations in the language: AND, OR, XOR, NOT. Only one argument is needed to work with NOT</p>
-<pre>
+<pre style='border:1px solid'>
 mov R1,1
 not R1
 
@@ -507,7 +507,7 @@ page_list["labels.txt"] = [[
 <p>From the chapter about memory, you know that labels are needed to work with the db command.
 But the main purpose of labels is to create JMP labels. These labels are needed in order to control the script.
 You can use them to <i>jump</i> from one part of the script to another part.</p>
-<pre>
+<pre style='border:1px solid'>
 mov R1,5
 jmp 'mylabel'
 add R1, 6
@@ -520,7 +520,7 @@ int 11
 </pre>
 <p>With this, you can build a cycle!</p>
 
-<pre>
+<pre style='border:1px solid'>
 Hello: db 'YOLO','$'
 mov INT_1, [Hello] word
 
@@ -531,7 +531,7 @@ jmp 'loop'
 <h3>CALL and RET</h3>
 <p>CALL and RET are needed to create routines. CALL adds the current script execution position to the stack and jumps to the label.
 RET gets the address from the stack and returns back.</p>
-<pre>
+<pre style='border:1px solid'>
 #predefine strings
 first: db 'First String','$'
 two:   db 'two string','$'
@@ -550,6 +550,143 @@ call print
 </pre>
 ]]
 
+page_list["labels.txt"] = [[
+<h2>LABELS, JMP</h2>
+<p>From the chapter about memory, you know that labels are needed to work with the db command.
+But the main purpose of labels is to create JMP labels. These labels are needed in order to control the script.
+You can use them to <i>jump</i> from one part of the script to another part.</p>
+<pre style='border:1px solid'>
+mov R1,5
+jmp 'mylabel'
+add R1, 6
+mylabel:
+
+mov INT_1,1
+MOV INT_2,1
+int 11
+# R1 = 5, not 11
+</pre>
+<p>With this, you can build a cycle!</p>
+
+<pre style='border:1px solid'>
+Hello: db 'YOLO','$'
+mov INT_1, [Hello] word
+
+loop:
+int 6
+jmp 'loop'
+</pre>
+<h3>CALL and RET</h3>
+<p>CALL and RET are needed to create routines. CALL adds the current script execution position to the stack and jumps to the label.
+RET gets the address from the stack and returns back.</p>
+<pre style='border:1px solid'>
+#predefine strings
+first: db 'First String','$'
+two:   db 'two string','$'
+
+jmp 'start'
+
+print:
+    push R1 word
+    mov INT_1, R1 word
+    int 6
+    ret
+
+start:
+mov R1, [first] word
+call 'print'
+</pre>
+]]
+
+page_list["cmp_guide.txt"] = [[
+<h2>BRANCHING PROGRAMM. JUMPS AND CMP</h2>
+<p>To branch a program, for example in E2 in wiremod, we need the 'if' operator. In gTASM we need <code>CMP</code>. It 'compares' 2 arguments to each other and allows us to branch the program.</p>
+
+<h3>How it works</h3>
+<p>for example, imagine this situation: we have a program in which two numbers are compared.</p>
+
+<pre style='border:1px solid'>
+text_1: db 'R1 is greater than 5', '$'
+text_2: db 'R1 is less than 5', '$'
+
+jmp 'start'
+
+END:
+    int 1
+
+greater:
+    mov INT_1, [text_1] word
+    int 6
+    jmp 'END'
+
+less:
+    mov INT_1, [text_2] word
+    int 6
+    jmp 'END'
+
+
+start:
+    mov R1, 9
+
+    cmp R1, 5
+    ja 'greater'
+    jb 'less'
+    int 1
+</pre>
+
+<p>The result of this program will be the output of a line in the terminal 'R1 greater than 5'.</p>
+<p>The whole process of the CMP command can be explained by the fact that it subtracts the second argument from the first, that is, ARG1 - ARG2.
+the result depends on how the flags will then be set in memory:</p>
+
+<table border='1' style='border-collapse:collapse;' cellpadding='5'><tbody>
+<tr>
+    <td>ARG1 - ARG2</td>
+    <td>Flags</td>
+</tr>
+<tr>
+    <td>rezult = 0</td>
+    <td>zf = 1 cf = 0</td>
+</tr>
+<tr>
+    <td>rezult < 0</td>
+    <td>zf = 0 cf = 1</td>
+</tr>
+<tr>
+    <td>rezult > 0</td>
+    <td>zf = 0 cf = 0</td>
+</tr>
+</table>
+
+<p>Then jumpers do all the work. By the way, here is a complete list of all JMP</p>
+
+<table border='1' style='border-collapse:collapse;' cellpadding='5'><tbody>
+<tr>
+    <td>Name</td>
+    <td>CMP action</td>
+    <td>Flag</td>
+</tr>
+<tr>
+    <td>JE</td>
+    <td>A = B</td>
+    <td>zf = 1</td>
+</tr>
+<tr>
+    <td>JNE</td>
+    <td>A != B</td>
+    <td>zf = 0</td>
+</tr>
+<tr>
+    <td>JA</td>
+    <td>A > B</td>
+    <td>cf == 0 and zf == 0</td>
+</tr>
+<tr>
+    <td>JB</td>
+    <td>A < B</td>
+    <td>cf = 1</td>
+</tr>
+</table>
+]]
 
 if file.IsDir( "gtasm_data", "DATA" ) == false then
     file.CreateDir("gtasm_data")

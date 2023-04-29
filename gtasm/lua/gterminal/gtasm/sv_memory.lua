@@ -171,19 +171,26 @@ function BlockMem:New(size)
 
         local data = self.data[dgt]
         local arr = tobase(data, 2, 64)
-        local arrm = {}
         local rez = {}
 
-        for i = 1, 8 * (byte or 1) do
-            if dpos >= 40 then
-                dpos = 0 - (i-1)
-                if #self.data < dgt+1 then
-                    return false
+        local shift = 1
+        local writeshift = 1
+
+        while table.Count(rez) != 8*(byte or 1) do
+            if dpos+shift > 40 then
+                dgt = dgt + 1
+                if !self.data[dgt] then
+                    -- error
+                    return "00000000"
                 end
-                data = self.data[dgt+1]
-                arr = tobase(data, 2, 64)
+                arr = tobase(self.data[dgt],2,64)
+                dpos =  0
+                shift = 1
             end
-            rez[i] = arr[dpos + i]
+            rez[writeshift] = arr[dpos + shift]
+            
+            writeshift = writeshift + 1
+            shift = shift + 1
         end
 
         return table.concat(rez),byte or nil
@@ -226,7 +233,7 @@ function BlockMem:New(size)
 
     end
 
-    function obj:PrintVal()
+    function obj:PrintVal() -- for debug
         for k,v in pairs(self.data) do
             local arr = tobase(v,2,64)
             print("BLOCK: ",k)
@@ -282,6 +289,7 @@ function BankMem:Create(array, eid)
 
     function obj:BlockPos(apos)
         local pos = tonumber(apos)
+
         if pos > self.bdsize then
             return -1
         end
@@ -373,9 +381,10 @@ function BankMem:Create(array, eid)
     end
     
     function obj:ErrorM(arg)
-        debug.Trace()
+        --debug.Trace()
         hook.Call("gTASM","MemoryIndexE", self.eid,arg)
     end
+
     setmetatable(obj, self)
     self.__index = self; return obj
 end
